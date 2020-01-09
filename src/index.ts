@@ -79,7 +79,15 @@ function createReadStream(path: string, options = { encoding: 'utf-8' }) {
 }
 
 
-async function main() {
+type CommandLineArguments = {
+    commandLineUrls: ReadonlyArray<string>
+    outputDirectory: string
+    sleepMs: number
+    input: string | null
+}
+
+
+function parseCommandLineArguments(): CommandLineArguments {
     const parser = new ArgumentParser({
         version: '0.1.0',
         prog: 'mediafire-dl'
@@ -99,25 +107,23 @@ async function main() {
         dest: 'input',
         metavar: 'FILE'
     })
-    parser.addArgument('commandlineUrls', {
+    parser.addArgument('commandLineUrls', {
         nargs: '*',
         metavar: 'url'
     })
+    return parser.parseArgs()
+}
 
-    type Arguments = {
-        commandlineUrls: ReadonlyArray<string>
-        outputDirectory: string
-        sleepMs: number
-        input: string | null
-    }
+
+async function main() {
     const {
-        commandlineUrls,
+        commandLineUrls,
         outputDirectory,
         sleepMs,
         input
-    }: Arguments = parser.parseArgs()
+    } = parseCommandLineArguments()
 
-    let urls = commandlineUrls
+    let urls = commandLineUrls
     if (input === '-') {
         urls = await readLinesToArray(process.stdin)
     }
@@ -132,7 +138,7 @@ async function main() {
         }
         urls = await readLinesToArray(stream)
     }
-    else if (commandlineUrls.length === 0) {
+    else if (commandLineUrls.length === 0) {
         printError(`URL(s) required when not using '--input'`, 2)
         return
     }
