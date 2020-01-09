@@ -233,7 +233,7 @@ async function main() {
         console.log(outputPath)
 
         if (index + 1 !== urls.length) {
-            await sleep(200)
+            await sleep(sleepMs)
         }
     }
 }
