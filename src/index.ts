@@ -1,5 +1,8 @@
+import 'source-map-support/register'
+
 import * as fs from 'fs'
 import * as path from 'path'
+import * as readline from 'readline'
 
 import { JSDOM } from 'jsdom'
 import fetch, { Response } from 'node-fetch'
@@ -54,6 +57,28 @@ function printError(message: string, exitCode: 0 | 1 | 2 = 1) {
 }
 
 
+function readLinesToArray(input: NodeJS.ReadableStream) {
+    return new Promise<string[]>(resolve => {
+        const reader = readline.createInterface({
+            input,
+            terminal: false
+        })
+        const lines: string[] = []
+        reader.on('line', line => lines.push(line))
+        reader.on('close', () => resolve(lines))
+    })
+}
+
+
+function createReadStream(path: string, options = { encoding: 'utf-8' }) {
+    return new Promise<fs.ReadStream>((resolve, reject) => {
+        const stream = fs.createReadStream(path, options)
+        stream.on('error', reject)
+        stream.on('ready', () => resolve(stream))
+    })
+}
+
+
 async function main() {
     const parser = new ArgumentParser({
         version: '0.1.0',
@@ -70,17 +95,47 @@ async function main() {
         metavar: 'MILLISECONDS',
         type: Number
     })
-    parser.addArgument('urls', {
-        nargs: '+',
+    parser.addArgument(['-i', '--input'], {
+        dest: 'input',
+        metavar: 'FILE'
+    })
+    parser.addArgument('commandlineUrls', {
+        nargs: '*',
         metavar: 'url'
     })
 
     type Arguments = {
-        urls: ReadonlyArray<string>
+        commandlineUrls: ReadonlyArray<string>
         outputDirectory: string
         sleepMs: number
+        input: string | null
     }
-    const { urls, outputDirectory, sleepMs }: Arguments = parser.parseArgs()
+    const {
+        commandlineUrls,
+        outputDirectory,
+        sleepMs,
+        input
+    }: Arguments = parser.parseArgs()
+
+    let urls = commandlineUrls
+    if (input === '-') {
+        urls = await readLinesToArray(process.stdin)
+    }
+    else if (input !== null) {
+        let stream: fs.ReadStream
+        try {
+            stream = await createReadStream(input)
+        }
+        catch (exception) {
+            printError(`${exception.code} error opening input file: ${input}`, 2)
+            return
+        }
+        urls = await readLinesToArray(stream)
+    }
+    else if (commandlineUrls.length === 0) {
+        printError(`URL(s) required when not using '--input'`, 2)
+        return
+    }
 
     if (!Number.isSafeInteger(sleepMs) || sleepMs < 0) {
         printError(`Sleep milliseconds value must be a positive integer`, 2)
