@@ -1,0 +1,25 @@
+{
+  "name": "mediafire-dl",
+  "version": "0.1.0",
+  "main": "dist/es5/index.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/elcr/mediafire-dl.git"
+  },
+  "author": "elcr",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/argparse": "^1.0.38",
+    "@types/jsdom": "^12.2.4",
+    "@types/node-fetch": "^2.5.4",
+    "typescript": "^3.7.4"
+  },
+  "dependencies": {
+    "argparse": "^1.0.10",
+    "jsdom": "^15.2.1",
+    "node-fetch": "^2.6.0"
+  },
+  "scripts": {
+    "build": "tsc"
+  }
+}
