@@ -1,8 +1,9 @@
 import 'source-map-support/register'
 
-import * as fs from 'fs'
-import * as path from 'path'
-import * as readline from 'readline'
+import fs from 'fs'
+import path from 'path'
+import readline from 'readline'
+import { Readable, Writable } from 'stream'
 
 import fetch, { Response } from 'node-fetch'
 import { ArgumentParser } from 'argparse'
@@ -55,7 +56,7 @@ function readLinesToArray(input: NodeJS.ReadableStream) {
 }
 
 
-function createReadStream(path: string, encoding = 'utf-8'): Promise<fs.ReadStream> {
+function createReadStream(path: string, encoding = 'utf-8'): Promise<Readable> {
     return new Promise((resolve, reject) => {
         const stream = fs.createReadStream(path, encoding)
         stream.on('error', reject)
@@ -64,11 +65,25 @@ function createReadStream(path: string, encoding = 'utf-8'): Promise<fs.ReadStre
 }
 
 
-function createWriteStream(path: string): Promise<fs.WriteStream> {
+function createWriteStream(path: string): Promise<Writable> {
     return new Promise((resolve, reject) => {
         const stream = fs.createWriteStream(path)
         stream.on('error', reject)
         stream.on('ready', () => resolve(stream))
+    })
+}
+
+
+interface Pipeable {
+    pipe: (destination: Writable) => Writable
+    on: (event: 'end', callback: () => void) => void
+}
+
+
+function pipeStream(input: Pipeable, output: Writable): Promise<void> {
+    return new Promise(resolve => {
+        input.pipe(output)
+        input.on('end', resolve)
     })
 }
 
@@ -122,7 +137,7 @@ async function main() {
         urls = await readLinesToArray(process.stdin)
     }
     else if (input !== null) {
-        let stream: fs.ReadStream
+        let stream: Readable
         try {
             stream = await createReadStream(input)
         }
@@ -181,7 +196,7 @@ async function main() {
             continue
         }
 
-        const downloadUrl = text.match(/\"Download file\" href=\"(.+?)"/)?.[1]
+        const downloadUrl = text.match(/"Download file"\s+href="(.+?)"/)?.[1]
         if (downloadUrl === undefined) {
             printError(`Could not find download URL in HTML: ${url}`)
             continue
@@ -201,9 +216,9 @@ async function main() {
 
         const outputPath = path.join(outputDirectory, filename)
 
-        let stream: fs.WriteStream
+        let outputStream: Writable
         try {
-            stream = await createWriteStream(outputPath)
+            outputStream = await createWriteStream(outputPath)
         }
         catch (exception) {
             printError(`${exception.code} error opening output file: ${outputPath}`)
@@ -211,9 +226,9 @@ async function main() {
         }
 
         try {
-            response.body.pipe(stream)
+            await pipeStream(response.body, outputStream)
         }
-        catch (exception) {
+        catch {
             printError(`Error writing response data: ${outputPath}`)
             continue
         }
