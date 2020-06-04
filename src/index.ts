@@ -9,11 +9,11 @@ import fetch, { Response } from 'node-fetch'
 import { ArgumentParser } from 'argparse'
 
 
-function * enumerate<T>(iterator: Iterable<T>) {
-    let index = 0
+function * enumerate<T>(iterator: Iterable<T>, start = 0, step = 1) {
+    let index = start
     for (const item of iterator) {
         yield [ index, item ] as [ number, T ]
-        index++
+        index += step
     }
 }
 
@@ -21,20 +21,6 @@ function * enumerate<T>(iterator: Iterable<T>) {
 function mkdir(path: string, options = { recursive: true }) {
     return new Promise<void>((resolve, reject) => {
         fs.mkdir(path, options, error => {
-            if (error === null) {
-                resolve()
-            }
-            else {
-                reject(error)
-            }
-        })
-    })
-}
-
-
-function writeFile(path: string, data: Buffer) {
-    return new Promise<void>((resolve, reject) => {
-        fs.writeFile(path, data, error => {
             if (error === null) {
                 resolve()
             }
@@ -70,9 +56,18 @@ function readLinesToArray(input: NodeJS.ReadableStream) {
 }
 
 
-function createReadStream(path: string, options = { encoding: 'utf-8' }) {
-    return new Promise<fs.ReadStream>((resolve, reject) => {
-        const stream = fs.createReadStream(path, options)
+function createReadStream(path: string, encoding = 'utf-8'): Promise<fs.ReadStream> {
+    return new Promise((resolve, reject) => {
+        const stream = fs.createReadStream(path, encoding)
+        stream.on('error', reject)
+        stream.on('ready', () => resolve(stream))
+    })
+}
+
+
+function createWriteStream(path: string): Promise<fs.WriteStream> {
+    return new Promise((resolve, reject) => {
+        const stream = fs.createWriteStream(path)
         stream.on('error', reject)
         stream.on('ready', () => resolve(stream))
     })
@@ -158,7 +153,7 @@ async function main() {
         }
     }
 
-    for (const [ index, url ] of enumerate(urls)) {
+    for (const [ index, url ] of enumerate(urls, 1)) {
         let response: Response
         try {
             response = await fetch(url)
@@ -218,27 +213,28 @@ async function main() {
             continue
         }
 
-        let data: Buffer
+        const outputPath = path.join(outputDirectory, filename)
+
+        let stream: fs.WriteStream
         try {
-            data = await response.buffer()
+            stream = await createWriteStream(outputPath)
         }
-        catch {
-            printError(`Error getting response data: ${downloadUrl}`)
+        catch (exception) {
+            printError(`${exception.code} error opening output file: ${outputPath}`)
             continue
         }
 
-        const outputPath = path.join(outputDirectory, filename)
         try {
-            await writeFile(outputPath, data)
+            response.body.pipe(stream)
         }
         catch (exception) {
-            printError(`${exception.code} error trying to write file: ${outputPath}`)
+            printError(`Error writing response data: ${outputPath}`)
             continue
         }
 
         console.log(outputPath)
 
-        if (index + 1 !== urls.length) {
+        if (index !== urls.length) {
             await sleep(sleepMs)
         }
     }
