@@ -1,150 +1,19 @@
 import 'source-map-support/register'
 
-import fs from 'fs'
 import path from 'path'
-import readline from 'readline'
 import { Readable, Writable } from 'stream'
 
 import fetch, { Response } from 'node-fetch'
-import { ArgumentParser } from 'argparse'
 
-import packageJSON from '../package.json'
-
-
-type PrintArguments = {
-    stream?: NodeJS.WriteStream
-    end?: string
-    clear?: boolean
-}
-
-
-function print(message: string, { stream = process.stdout, end = '\n', clear = true }: PrintArguments = {}) {
-    if (clear) {
-        stream.clearLine(0)
-    }
-    stream.cursorTo(0)
-    stream.write(message + end)
-}
-
-
-type PrintErrorArguments = {
-    code?: 0 | 1 | 2
-}
-
-
-function printError(message: string, { code = 1 }: PrintErrorArguments = {}) {
-    print(message, { stream: process.stderr, clear: false })
-    process.exitCode = code
-}
-
-
-function * enumerate<T>(iterator: Iterable<T>, start = 0, step = 1): Iterable<[ number, T ]> {
-    let index = start
-    for (const item of iterator) {
-        yield [ index, item ]
-        index += step
-    }
-}
-
-
-function mkdir(path: string, options = { recursive: true }): Promise<void> {
-    return new Promise((resolve, reject) => {
-        fs.mkdir(path, options, error => {
-            if (error === null) {
-                resolve()
-            }
-            else {
-                reject(error)
-            }
-        })
-    })
-}
-
-
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-
-function readLinesToArray(input: Readable): Promise<string[]> {
-    return new Promise(resolve => {
-        const reader = readline.createInterface({
-            input,
-            terminal: false
-        })
-        const lines: string[] = []
-        reader.on('line', line => lines.push(line))
-        reader.on('close', () => resolve(lines))
-    })
-}
-
-
-function createReadStream(path: string, encoding = 'utf-8'): Promise<Readable> {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createReadStream(path, encoding)
-        stream.on('error', reject)
-        stream.on('ready', () => resolve(stream))
-    })
-}
-
-
-function createWriteStream(path: string): Promise<Writable> {
-    return new Promise((resolve, reject) => {
-        const stream = fs.createWriteStream(path)
-        stream.on('error', reject)
-        stream.on('ready', () => resolve(stream))
-    })
-}
-
-
-interface Pipeable {
-    on(event: 'end', callback: () => void): void
-    pipe(output: Writable): void
-}
-
-
-function pipeStream(input: Pipeable, output: Writable): Promise<void> {
-    return new Promise(resolve => {
-        input.pipe(output)
-        input.on('end', resolve)
-    })
-}
-
-
-type CommandLineArguments = {
-    commandLineUrls: ReadonlyArray<string>
-    outputDirectory: string
-    sleepMs: number
-    input: string | null
-}
-
-
-function parseCommandLineArguments(): CommandLineArguments {
-    const parser = new ArgumentParser({
-        version: packageJSON.version,
-        prog: packageJSON.name
-    })
-    parser.addArgument(['-o', '--output-directory'], {
-        defaultValue: '.',
-        dest: 'outputDirectory',
-        metavar: 'DIRECTORY'
-    })
-    parser.addArgument(['-s', '--sleep-ms'], {
-        defaultValue: 200,
-        dest: 'sleepMs',
-        metavar: 'MILLISECONDS',
-        type: Number
-    })
-    parser.addArgument(['-i', '--input'], {
-        dest: 'input',
-        metavar: 'FILE'
-    })
-    parser.addArgument('commandLineUrls', {
-        nargs: '*',
-        metavar: 'url'
-    })
-    return parser.parseArgs()
-}
+import { print, printError, enumerate, sleep } from './utils'
+import {
+    readLinesToArray,
+    createReadStream,
+    mkdir,
+    createWriteStream,
+    pipeStream
+} from './fileSystem'
+import { parseCommandLineArguments } from './cli'
 
 
 async function main() {
