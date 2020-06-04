@@ -8,18 +8,20 @@ import { Readable, Writable } from 'stream'
 import fetch, { Response } from 'node-fetch'
 import { ArgumentParser } from 'argparse'
 
+import packageJSON from '../package.json'
 
-function * enumerate<T>(iterator: Iterable<T>, start = 0, step = 1) {
+
+function * enumerate<T>(iterator: Iterable<T>, start = 0, step = 1): Iterable<[ number, T ]> {
     let index = start
     for (const item of iterator) {
-        yield [ index, item ] as [ number, T ]
+        yield [ index, item ]
         index += step
     }
 }
 
 
-function mkdir(path: string, options = { recursive: true }) {
-    return new Promise<void>((resolve, reject) => {
+function mkdir(path: string, options = { recursive: true }): Promise<void> {
+    return new Promise((resolve, reject) => {
         fs.mkdir(path, options, error => {
             if (error === null) {
                 resolve()
@@ -32,8 +34,8 @@ function mkdir(path: string, options = { recursive: true }) {
 }
 
 
-function sleep(ms: number) {
-    return new Promise<void>(resolve => setTimeout(resolve, ms))
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 
@@ -43,8 +45,8 @@ function printError(message: string, exitCode: 0 | 1 | 2 = 1) {
 }
 
 
-function readLinesToArray(input: NodeJS.ReadableStream) {
-    return new Promise<string[]>(resolve => {
+function readLinesToArray(input: Readable): Promise<string[]> {
+    return new Promise(resolve => {
         const reader = readline.createInterface({
             input,
             terminal: false
@@ -98,8 +100,8 @@ type CommandLineArguments = {
 
 function parseCommandLineArguments(): CommandLineArguments {
     const parser = new ArgumentParser({
-        version: '0.1.0',
-        prog: 'mediafire-dl'
+        version: packageJSON.version,
+        prog: packageJSON.name
     })
     parser.addArgument(['-o', '--output-directory'], {
         defaultValue: '.',
@@ -242,6 +244,4 @@ async function main() {
 }
 
 
-if (require.main === module) {
-    main()
-}
+main()
