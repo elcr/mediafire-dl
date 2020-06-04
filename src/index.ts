@@ -4,7 +4,6 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as readline from 'readline'
 
-import { JSDOM } from 'jsdom'
 import fetch, { Response } from 'node-fetch'
 import { ArgumentParser } from 'argparse'
 
@@ -163,7 +162,7 @@ async function main() {
             continue
         }
         if (!response.ok) {
-            printError(`Fetching page URL returned ${response.status}: ${URL}`)
+            printError(`Fetching page URL returned ${response.status}: ${url}`)
             continue
         }
 
@@ -176,27 +175,14 @@ async function main() {
             continue
         }
 
-        let document: Document
-        try {
-            document = new JSDOM(text).window.document
-        }
-        catch {
-            printError(`Error creating DOM from response text: ${url}`)
-            continue
-        }
-
-        const filename = document.querySelector('.filename')
-            ?.textContent
-            ?? null
-        if (filename === null) {
+        const filename = text.match(/class="filename">(.+?)</)?.[1]
+        if (filename === undefined) {
             printError(`Could not find filename in HTML: ${url}`)
             continue
         }
 
-        const downloadUrl = document.querySelector('#download_link .input')
-            ?.getAttribute('href')
-            ?? null
-        if (downloadUrl === null) {
+        const downloadUrl = text.match(/\"Download file\" href=\"(.+?)"/)?.[1]
+        if (downloadUrl === undefined) {
             printError(`Could not find download URL in HTML: ${url}`)
             continue
         }
