@@ -56,7 +56,7 @@ interface Pipeable {
 
 export function pipeStream(input: Pipeable, output: Writable): Promise<void> {
     return new Promise(resolve => {
-        input.pipe(output)
         input.on('end', resolve)
+        input.pipe(output)
     })
 }
